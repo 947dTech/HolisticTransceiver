@@ -1,0 +1,40 @@
+package com.ksndtech.holistictransceiver.processing
+
+import android.content.Context
+import android.os.SystemClock
+import com.google.mediapipe.framework.image.MPImage
+import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.vision.core.RunningMode
+import com.google.mediapipe.tasks.vision.holisticlandmarker.HolisticLandmarker
+import com.google.mediapipe.tasks.vision.holisticlandmarker.HolisticLandmarkerResult
+
+class HolisticLandmarkerHelper(
+    context: Context,
+    private val onResult: (HolisticLandmarkerResult, MPImage) -> Unit,
+    private val onError: (String) -> Unit
+) {
+    private val landmarker: HolisticLandmarker
+
+    init {
+        val baseOptions = BaseOptions.builder()
+            .setModelAssetPath("holistic_landmarker.task")
+            .build()
+
+        val options = HolisticLandmarker.HolisticLandmarkerOptions.builder()
+            .setBaseOptions(baseOptions)
+            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setResultListener { result, inputImage -> onResult(result, inputImage) }
+            .setErrorListener { error -> onError(error.message ?: "Unknown error") }
+            .build()
+
+        landmarker = HolisticLandmarker.createFromOptions(context, options)
+    }
+
+    fun detectAsync(mpImage: MPImage, timestampMs: Long) {
+        landmarker.detectAsync(mpImage, timestampMs)
+    }
+
+    fun close() {
+        landmarker.close()
+    }
+}

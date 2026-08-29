@@ -27,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ksndtech.holistictransceiver.camera.CameraPreviewViewModel
 import com.ksndtech.holistictransceiver.camera.displayName
 import com.ksndtech.holistictransceiver.camera.toCameraSelector
+import com.ksndtech.holistictransceiver.ui.camera.HolisticOverlay
 
 @Composable
 fun CameraPreviewScreen(
@@ -39,6 +40,8 @@ fun CameraPreviewScreen(
 
     var availableCameras by remember { mutableStateOf<List<CameraInfo>>(emptyList()) }
     var expanded by remember { mutableStateOf(false) }
+
+    val overlayState by viewModel.overlayState.collectAsState()
 
     LaunchedEffect(lifecycleOwner) {
         viewModel.bindToCamera(context.applicationContext, lifecycleOwner)
@@ -54,6 +57,9 @@ fun CameraPreviewScreen(
                 surfaceRequest = request,
                 modifier = Modifier.fillMaxSize()
             )
+        }
+        overlayState?.let { state ->
+            HolisticOverlay(state = state, modifier = Modifier.fillMaxSize())
         }
 
         Column(

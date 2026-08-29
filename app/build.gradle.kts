@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -34,6 +36,12 @@ android {
         compose = true
         viewBinding = true
     }
+    packaging {
+        resources {
+            // 一時的な回避として重複を許容する場合(根本解決ではない点に注意)
+//             pickFirsts += "META-INF/..."
+        }
+    }
 }
 
 dependencies {
@@ -59,6 +67,15 @@ dependencies {
     implementation(libs.androidx.camera.compose) // for compose UI
     implementation(libs.androidx.camera.extensions) // For Extensions
 
+//    implementation(libs.mediapipe.tasks.vision)
+
+    implementation(libs.mediapipe.tasks.vision) {
+        // MediaPipe内部のテレメトリ用ライブラリが引き込むprotobuf-javaliteを除外し、
+        // tasks-vision本体が要求するフル版protobuf-javaのみを解決させる
+        exclude(group = "com.google.protobuf", module = "protobuf-javalite")
+    }
+    implementation("com.google.protobuf:protobuf-java:3.25.5")
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -66,4 +83,22 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+tasks.register("downloadHolisticModel") {
+    val modelUrl = "https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task"
+    val outputFile = file("src/main/assets/holistic_landmarker.task")
+
+    doLast {
+        if (!outputFile.exists()) {
+            outputFile.parentFile.mkdirs()
+            outputFile.outputStream().use { out ->
+                URI(modelUrl).toURL().openStream().use { input -> input.copyTo(out) }
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("downloadHolisticModel")
 }
