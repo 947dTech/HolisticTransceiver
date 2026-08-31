@@ -18,6 +18,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.ksndtech.holistictransceiver.processing.HolisticLandmarkerHelper
+import com.ksndtech.holistictransceiver.processing.toRotatedBitmap
 import com.ksndtech.holistictransceiver.ui.camera.HolisticOverlayState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.collectLatest
 import java.util.concurrent.Executors
 
 class CameraPreviewViewModel : ViewModel() {
+    private val _lensFacing = MutableStateFlow(CameraCharacteristics.LENS_FACING_BACK)
+    val lensFacing: StateFlow<Int> = _lensFacing
+
     private val _surfaceRequest = MutableStateFlow<SurfaceRequest?>(null)
     val surfaceRequest: StateFlow<SurfaceRequest?> = _surfaceRequest
 
@@ -45,8 +49,20 @@ class CameraPreviewViewModel : ViewModel() {
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
 
-    fun switchCamera(selector: CameraSelector) {
+    // 単純な前面/背面トグル用
+    fun switchCamera(selector: CameraSelector, facing: Int) {
         _cameraSelector.value = selector
+        _lensFacing.value = facing
+    }
+
+    // ドロップダウンでのカメラ一覧選択用
+    @OptIn(ExperimentalCamera2Interop::class)
+    fun selectCamera(cameraInfo: CameraInfo) {
+        val characteristics = Camera2CameraInfo.from(cameraInfo)
+        val facing = characteristics.getCameraCharacteristic(CameraCharacteristics.LENS_FACING)
+            ?: CameraCharacteristics.LENS_FACING_BACK
+        _cameraSelector.value = cameraInfo.toCameraSelector()
+        _lensFacing.value = facing
     }
 
     private val _overlayState = MutableStateFlow<HolisticOverlayState?>(null)
@@ -75,7 +91,8 @@ class CameraPreviewViewModel : ViewModel() {
             )
 
             imageAnalysisUseCase.setAnalyzer(analysisExecutor) { imageProxy ->
-                val bitmap = imageProxy.toBitmap()
+                val isFrontCamera = lensFacing.value == CameraCharacteristics.LENS_FACING_FRONT
+                val bitmap = imageProxy.toRotatedBitmap(isFrontCamera)
                 val mpImage = BitmapImageBuilder(bitmap).build()
                 holisticLandmarkerHelper?.detectAsync(mpImage, SystemClock.uptimeMillis())
                 imageProxy.close()

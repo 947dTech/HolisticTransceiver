@@ -22,8 +22,7 @@ fun HolisticOverlay(state: HolisticOverlayState, modifier: Modifier = Modifier) 
         fun NormalizedLandmark.toOffset(): Offset {
             val px = x() * imageWidth * scale + offsetX
             val py = y() * imageHeight * scale + offsetY
-            val mirroredX = if (state.isFrontCamera) size.width - px else px
-            return Offset(mirroredX, py)
+            return Offset(px, py)
         }
 
         fun drawPoints(landmarks: List<NormalizedLandmark>, color: Color) {

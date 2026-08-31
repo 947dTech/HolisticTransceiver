@@ -78,7 +78,8 @@ fun CameraPreviewScreen(
                     DropdownMenuItem(
                         text = { Text(cameraInfo.displayName()) },
                         onClick = {
-                            viewModel.switchCamera(cameraInfo.toCameraSelector())
+                            viewModel.selectCamera(cameraInfo)
+//                            viewModel.switchCamera(cameraInfo.toCameraSelector())
                             expanded = false
                         }
                     )
