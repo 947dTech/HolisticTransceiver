@@ -1,5 +1,6 @@
 package com.ksndtech.holistictransceiver.camera
 
+import android.app.Application
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -14,19 +15,29 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.ksndtech.holistictransceiver.data.UdpSettings
+import com.ksndtech.holistictransceiver.data.UdpSettingsRepository
+import com.ksndtech.holistictransceiver.network.UdpSender
+import com.ksndtech.holistictransceiver.network.toFrameDto
 import com.ksndtech.holistictransceiver.processing.HolisticLandmarkerHelper
 import com.ksndtech.holistictransceiver.processing.toRotatedBitmap
 import com.ksndtech.holistictransceiver.ui.camera.HolisticOverlayState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.concurrent.Executors
 
-class CameraPreviewViewModel : ViewModel() {
+class CameraPreviewViewModel(application: Application) : AndroidViewModel(application) {
     private val _lensFacing = MutableStateFlow(CameraCharacteristics.LENS_FACING_BACK)
     val lensFacing: StateFlow<Int> = _lensFacing
 
@@ -48,6 +59,19 @@ class CameraPreviewViewModel : ViewModel() {
     private val imageAnalysisUseCase = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
+
+    private val settingsRepository = UdpSettingsRepository(application)
+    private val udpSender = UdpSender()
+
+    private val udpSettings: StateFlow<UdpSettings> = settingsRepository.settingsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = UdpSettings()
+    )
+
+    private val jsonFormat = Json {
+        encodeDefaults = true
+    }
 
     // 単純な前面/背面トグル用
     fun switchCamera(selector: CameraSelector, facing: Int) {
@@ -78,6 +102,8 @@ class CameraPreviewViewModel : ViewModel() {
             holisticLandmarkerHelper = HolisticLandmarkerHelper(
                 context = appContext,
                 onResult = { result, inputImage ->
+                    val stampNs = System.currentTimeMillis() * 1_000_000L
+
                     _overlayState.value = HolisticOverlayState(
                         faceLandmarks = result.faceLandmarks(),
                         poseLandmarks = result.poseLandmarks(),
@@ -86,6 +112,16 @@ class CameraPreviewViewModel : ViewModel() {
                         imageWidth = inputImage.width,
                         imageHeight = inputImage.height,
                         isFrontCamera = cameraSelector.value == CameraSelector.DEFAULT_FRONT_CAMERA)
+
+                    // UDP送信用のシリアライズ
+                    val dto = result.toFrameDto(stampNs)
+                    val jsonText = jsonFormat.encodeToString(dto)
+                    // val settings = udpSettings.value
+                    viewModelScope.launch {
+                        val settings = settingsRepository.getCurrent()
+                        Log.d("UdpDebug", "送信先: ${settings.host}:${settings.port}")
+                        udpSender.send(jsonText.toByteArray(Charsets.UTF_8), settings.host, settings.port)
+                    }
                 },
                 onError = { message -> Log.e("HolisticLandmarker", message) }
             )
@@ -118,6 +154,7 @@ class CameraPreviewViewModel : ViewModel() {
         super.onCleared()
         holisticLandmarkerHelper?.close()
         analysisExecutor.shutdown()
+        udpSender.close()
     }
 
     suspend fun getAvailableCameras(appContext: Context): List<CameraInfo> {

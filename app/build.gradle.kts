@@ -3,6 +3,7 @@ import java.net.URI
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -52,6 +53,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     implementation(libs.androidx.concurrent.features)
@@ -66,6 +68,11 @@ dependencies {
     implementation(libs.androidx.camera.view) // for PreviewView
     implementation(libs.androidx.camera.compose) // for compose UI
     implementation(libs.androidx.camera.extensions) // For Extensions
+
+    // material-icons is deprecated
+    implementation("androidx.compose.material:material-icons-core")
+
+    implementation(libs.kotlinx.serialization.json)
 
 //    implementation(libs.mediapipe.tasks.vision)
 

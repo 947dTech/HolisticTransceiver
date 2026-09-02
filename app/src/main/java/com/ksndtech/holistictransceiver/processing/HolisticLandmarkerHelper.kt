@@ -23,6 +23,7 @@ class HolisticLandmarkerHelper(
         val options = HolisticLandmarker.HolisticLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
+            .setOutputFaceBlendshapes(true)
             .setResultListener { result, inputImage -> onResult(result, inputImage) }
             .setErrorListener { error -> onError(error.message ?: "Unknown error") }
             .build()
