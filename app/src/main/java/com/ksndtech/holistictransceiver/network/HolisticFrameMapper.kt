@@ -5,7 +5,11 @@ import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.components.containers.Landmark
 import com.google.mediapipe.tasks.vision.holisticlandmarker.HolisticLandmarkerResult
 
-fun HolisticLandmarkerResult.toFrameDto(stampNs: Long): HolisticFrameDto {
+fun HolisticLandmarkerResult.toFrameDto(
+    stampNs: Long,
+    gravity: FloatArray,
+    cameraParams: CameraParamsDto
+): HolisticFrameDto {
     fun List<Category>.toBlendshapeMap(): Map<String, Float> =
         associate { it.categoryName() to it.score() }
     fun List<NormalizedLandmark>.toDtoList() = map { LandmarkDto(it.x(), it.y(), it.z()) }
@@ -26,6 +30,8 @@ fun HolisticLandmarkerResult.toFrameDto(stampNs: Long): HolisticFrameDto {
         right_hand_landmarks_stamp = stampNs,
         right_hand_landmarks = rightHandLandmarks().toDtoList(),
         right_hand_world_landmarks_stamp = stampNs,
-        right_hand_world_landmarks = rightHandWorldLandmarks().toDtoList()
+        right_hand_world_landmarks = rightHandWorldLandmarks().toDtoList(),
+        gravity = gravity.toList(),
+        camera_params = cameraParams
     )
 }

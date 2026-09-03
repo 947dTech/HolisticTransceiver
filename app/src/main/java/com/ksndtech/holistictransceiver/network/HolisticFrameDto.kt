@@ -11,6 +11,8 @@ data class LandmarkDto(
 
 @Serializable
 data class HolisticFrameDto(
+    val gravity: List<Float>,
+    val camera_params: CameraParamsDto,
     val pose_landmarks_stamp: Long, // 取得時刻(epoch ns)
     val pose_landmarks: List<LandmarkDto>,
     val pose_world_landmarks_stamp: Long,

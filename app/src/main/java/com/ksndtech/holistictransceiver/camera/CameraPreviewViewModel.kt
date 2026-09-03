@@ -21,10 +21,12 @@ import androidx.lifecycle.viewModelScope
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.ksndtech.holistictransceiver.data.UdpSettings
 import com.ksndtech.holistictransceiver.data.UdpSettingsRepository
+import com.ksndtech.holistictransceiver.network.CameraParamsDto
 import com.ksndtech.holistictransceiver.network.UdpSender
 import com.ksndtech.holistictransceiver.network.toFrameDto
 import com.ksndtech.holistictransceiver.processing.HolisticLandmarkerHelper
 import com.ksndtech.holistictransceiver.processing.toRotatedBitmap
+import com.ksndtech.holistictransceiver.sensor.GravitySensorProvider
 import com.ksndtech.holistictransceiver.ui.camera.HolisticOverlayState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +62,10 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
 
+    private val _cameraParams = MutableStateFlow<CameraParamsDto?>(null)
+    val cameraParams: StateFlow<CameraParamsDto?> = _cameraParams
+    private val gravityProvider = GravitySensorProvider(application)
+
     private val settingsRepository = UdpSettingsRepository(application)
     private val udpSender = UdpSender()
 
@@ -93,6 +99,7 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
     val overlayState: StateFlow<HolisticOverlayState?> = _overlayState
 
     suspend fun bindToCamera(appContext: Context, lifecycleOwner: LifecycleOwner) {
+        gravityProvider.start()
         val processCameraProvider = ProcessCameraProvider.getInstance(appContext).await()
 
         // Helperとanalyzerの初期化は一度だけ。collectLatestの再実行(カメラ切替)のたびに
@@ -102,6 +109,14 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
             holisticLandmarkerHelper = HolisticLandmarkerHelper(
                 context = appContext,
                 onResult = { result, inputImage ->
+                    Log.d(
+                        "HolisticDebug",
+                        "onResult fired. pose=${result.poseLandmarks().size}" +
+                                " face=${result.faceLandmarks().size}" +
+                                " lhand=${result.leftHandLandmarks().size}" +
+                                " rhand=${result.rightHandLandmarks().size}"
+                    )
+
                     val stampNs = System.currentTimeMillis() * 1_000_000L
 
                     _overlayState.value = HolisticOverlayState(
@@ -114,7 +129,10 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
                         isFrontCamera = cameraSelector.value == CameraSelector.DEFAULT_FRONT_CAMERA)
 
                     // UDP送信用のシリアライズ
-                    val dto = result.toFrameDto(stampNs)
+                    val dto = result.toFrameDto(
+                        stampNs,
+                        gravityProvider.gravity.value,
+                        _cameraParams.value ?: CameraParamsDto(0f, 0, 0, 0f, 0f))
                     val jsonText = jsonFormat.encodeToString(dto)
                     // val settings = udpSettings.value
                     viewModelScope.launch {
@@ -136,12 +154,23 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
         }
 
         cameraSelector.collectLatest { selector ->
-            processCameraProvider.bindToLifecycle(
+            var camera = processCameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 selector,
                 cameraPreviewUseCase,
                 imageAnalysisUseCase
             )
+
+            // bindToLifecycle成功直後、実際のバインド結果からカメラパラメータを算出
+            val resolution = imageAnalysisUseCase.resolutionInfo?.resolution
+            if (resolution != null) {
+                _cameraParams.value = extractCameraParams(
+                    cameraInfo = camera.cameraInfo,
+                    frameWidth = resolution.width,
+                    frameHeight = resolution.height
+                )
+            }
+
             try {
                 awaitCancellation()
             } finally {
@@ -152,6 +181,7 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
 
     override fun onCleared() {
         super.onCleared()
+        gravityProvider.stop()
         holisticLandmarkerHelper?.close()
         analysisExecutor.shutdown()
         udpSender.close()
