@@ -1,6 +1,7 @@
 package com.ksndtech.holistictransceiver.camera
 
 import android.hardware.camera2.CameraCharacteristics
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -17,6 +18,7 @@ fun extractCameraParams(cameraInfo: CameraInfo, frameWidth: Int, frameHeight: In
     val referenceRect = characteristics.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE)
         ?: characteristics.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
     if (intrinsic != null && referenceRect != null) {
+        Log.d("CameraParam", "intrinsic found")
         val scaleX = frameWidth.toFloat() / referenceRect.width()
         val scaleY = frameHeight.toFloat() / referenceRect.height()
         // intrinsic = [fx, fy, cx, cy, skew]
@@ -28,6 +30,8 @@ fun extractCameraParams(cameraInfo: CameraInfo, frameWidth: Int, frameHeight: In
             cy = intrinsic[3] * scaleY
         )
     }
+
+    Log.d("CameraParam", "intrinsic not found")
 
     // フォールバック: 焦点距離(mm)+センサー物理サイズ(mm)から画素単位のfxを算出、pixelArraySizeではなく現在のframeWidthを使う
     val focalLengths = characteristics.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
