@@ -8,5 +8,6 @@ data class CameraParamsDto(
     val frame_width: Int,
     val frame_height: Int,
     val cx: Float,
-    val cy: Float
+    val cy: Float,
+    val rotation_degrees: Int = 0
 )

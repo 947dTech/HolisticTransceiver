@@ -108,14 +108,14 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
         if (holisticLandmarkerHelper == null) {
             holisticLandmarkerHelper = HolisticLandmarkerHelper(
                 context = appContext,
-                onResult = { result, inputImage ->
-                    Log.d(
-                        "HolisticDebug",
-                        "onResult fired. pose=${result.poseLandmarks().size}" +
-                                " face=${result.faceLandmarks().size}" +
-                                " lhand=${result.leftHandLandmarks().size}" +
-                                " rhand=${result.rightHandLandmarks().size}"
-                    )
+                onResult = { result, inputImage, rotationDegrees ->
+                    // Log.d(
+                    //     "HolisticDebug",
+                    //     "onResult fired. pose=${result.poseLandmarks().size}" +
+                    //             " face=${result.faceLandmarks().size}" +
+                    //             " lhand=${result.leftHandLandmarks().size}" +
+                    //             " rhand=${result.rightHandLandmarks().size}"
+                    // )
 
                     val stampNs = System.currentTimeMillis() * 1_000_000L
 
@@ -128,11 +128,14 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
                         imageHeight = inputImage.height,
                         isFrontCamera = cameraSelector.value == CameraSelector.DEFAULT_FRONT_CAMERA)
 
+                    val cameraParamsForFrame = (cameraParams.value ?: CameraParamsDto(0f, 0, 0, 0f, 0f))
+                        .copy(rotation_degrees = rotationDegrees)
+
                     // UDP送信用のシリアライズ
                     val dto = result.toFrameDto(
                         stampNs,
                         gravityProvider.gravity.value,
-                        _cameraParams.value ?: CameraParamsDto(0f, 0, 0, 0f, 0f))
+                        cameraParamsForFrame)
                     val jsonText = jsonFormat.encodeToString(dto)
                     // val settings = udpSettings.value
                     viewModelScope.launch {
@@ -148,7 +151,8 @@ class CameraPreviewViewModel(application: Application) : AndroidViewModel(applic
                 val isFrontCamera = lensFacing.value == CameraCharacteristics.LENS_FACING_FRONT
                 val bitmap = imageProxy.toRotatedBitmap(isFrontCamera)
                 val mpImage = BitmapImageBuilder(bitmap).build()
-                holisticLandmarkerHelper?.detectAsync(mpImage, SystemClock.uptimeMillis())
+                val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                holisticLandmarkerHelper?.detectAsync(mpImage, rotationDegrees,SystemClock.uptimeMillis())
                 imageProxy.close()
             }
         }
