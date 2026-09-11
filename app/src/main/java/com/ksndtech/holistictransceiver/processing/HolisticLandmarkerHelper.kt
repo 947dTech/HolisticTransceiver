@@ -27,9 +27,6 @@ class HolisticLandmarkerHelper(
         val options = HolisticLandmarker.HolisticLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
-            .setMinFaceDetectionConfidence(0.0f)  // 顔を隠すとすべて止まる挙動のワークアラウンド、止まらないがおかしな値が出ることに注意
-            .setMinFaceSuppressionThreshold(0.0f)  // 同上
-            .setMinFacePresenceConfidence(0.0f)  // 同上
             .setOutputFaceBlendshapes(true)
             .setResultListener { result, inputImage -> onResult(result, inputImage, lastRotationDegrees) }
             .setErrorListener { error -> onError(error.message ?: "Unknown error") }
